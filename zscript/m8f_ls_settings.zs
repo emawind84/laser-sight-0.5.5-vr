@@ -19,7 +19,7 @@ class m8f_ls_Settings
   bool   targetColorChange;
   bool   friendlyColorChange;
 
-  bool   hideOnSlot1;
+  bool   hideWithMeleeWeapon;
   bool   hideOnCloseDistance;
   bool   onlyWhenReady;
 
@@ -35,7 +35,7 @@ class m8f_ls_Settings
     targetColorChange   = CVar.GetCVar("m8f_wm_TSChangeLaserColor"    , player).GetInt();
     friendlyColorChange = CVar.GetCVar("m8f_ls_TSChangeColorFriendly" , player).GetInt();
 
-    hideOnSlot1         = CVar.GetCVar("m8f_ls_HideOnSlot1"           , player).GetInt();
+    hideWithMeleeWeapon = CVar.GetCVar("m8f_ls_HideWithMeleeWeapon"   , player).GetInt();
     hideOnCloseDistance = CVar.GetCVar("m8f_ls_hide_close"            , player).GetInt();
     onlyWhenReady       = CVar.GetCVar("m8f_ls_OnlyWhenReady"         , player).GetInt();
 

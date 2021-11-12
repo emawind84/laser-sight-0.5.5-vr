@@ -22,7 +22,8 @@ class m8f_ls_EventHandler : EventHandler
   private bool            _isInitialized;
   private m8f_ls_Settings _settings;
   private PlayerInfo      _player;
-  private Actor           _puff;
+  private Actor           _puffMainhand;
+  private Actor           _puffOffhand;
 
   // overrides section /////////////////////////////////////////////////////////
 
@@ -42,20 +43,15 @@ class m8f_ls_EventHandler : EventHandler
 
     if (!_isInitialized) { SetupPuff(players[consolePlayer]); }
 
-    if (!_puff) { return; }
+    if (!_puffMainhand && !_puffOffhand) { return; }
 
-    _puff.bInvisible = true;
+    _puffMainhand.bInvisible = true;
+    _puffOffhand.bInvisible = true;
 
     _settings.maybeUpdate(_player);
 
-    if (_settings.hideOnSlot1 && IsSlot1(_player)) { return; }
-
-    if (_settings.onlyWhenReady && !IsWeaponReady(_player)) { return; }
-
     bool showLaserSight = CVar.GetCVar("m8f_wm_ShowLaserSight", _player).GetInt();
     if (!showLaserSight) { return; }
-
-    if (_player.readyWeapon == null) { return; }
 
     CVar targetCVar       = CVar.GetCVar("m8f_ts_has_target", _player);
     CVar friendlyCVar     = CVar.GetCVar("m8f_ts_friendly_target", _player);
@@ -90,10 +86,12 @@ class m8f_ls_EventHandler : EventHandler
 
     _player        = players[consolePlayer];
     _settings      = new("m8f_ls_Settings").init(_player);
-    _puff          = Actor.Spawn("m8f_ls_LaserPuff");
+    _puffMainhand  = Actor.Spawn("m8f_ls_LaserPuff");
+    _puffOffhand   = Actor.Spawn("m8f_ls_LaserPuff");
     _isInitialized = true;
 
-    _puff.bInvisible = true;
+    _puffMainhand.bInvisible = true;
+    _puffOffhand.bInvisible = true;
   }
 
   private void ShowLaserSight(bool negative, bool friendly, PlayerInfo player)
@@ -103,18 +101,27 @@ class m8f_ls_EventHandler : EventHandler
 
     double pitch = a.AimTarget() ? a.BulletSlope(null, ALF_PORTALRESTRICT) : a.pitch;
 
-    MaybeShowDot(pitch, a, negative, friendly);
+    if (player.ReadyWeapon != null)
+    {
+      MaybeShowDot(pitch, a, negative, friendly, 0);
+    }
+    if (player.OffhandWeapon != null)
+    {
+      MaybeShowDot(pitch, a, negative, friendly, 1);
+    }
   }
 
-  private void MaybeShowDot(double pitch, Actor a, bool negative, bool friendly)
+  private void MaybeShowDot(double pitch, Actor a, bool negative, bool friendly, int hand)
   {
+    if (_settings.hideWithMeleeWeapon && IsMeleeWeapon(_player, hand)) { return; }
+    if (_settings.onlyWhenReady && !IsWeaponReady(_player, hand)) { return; }
     Actor  tempPuff = a.LineAttack( a.angle
                                   , 4000.0
                                   , pitch
                                   , 0
                                   , "none"
                                   , "m8f_ls_InvisiblePuff"
-                                  , lFlags
+                                  , lFlags | (!!hand ? LAF_ISOFFHAND : 0)
                                   );
 
     if (tempPuff == null) { return; }
@@ -130,6 +137,7 @@ class m8f_ls_EventHandler : EventHandler
     else if (negative) { shade = _settings.targetColor;   }
     else               { shade = _settings.noTargetColor; }
 
+    let _puff = !!hand ? _puffOffhand : _puffMainhand;
     _puff.SetShade(shade);
     _puff.scale.x    = scale;
     _puff.scale.y    = scale;
@@ -140,17 +148,18 @@ class m8f_ls_EventHandler : EventHandler
 
   // static functions section //////////////////////////////////////////////////
 
-  private play static bool IsSlot1(PlayerInfo player)
+  private play static bool IsMeleeWeapon(PlayerInfo player, int hand)
   {
-    Weapon w = player.readyWeapon;
+    Weapon w = !!hand ? player.OffhandWeapon : player.ReadyWeapon;
     if (w == null) { return false; }
 
-    int located;
-    int slot;
-    [located, slot] = player.weapons.LocateWeapon(w.GetClassName());
+    return w.bMeleeWeapon;
+    // int located;
+    // int slot;
+    // [located, slot] = player.weapons.LocateWeapon(w.GetClassName());
 
-    bool slot1 = (slot == 1);
-    return slot1;
+    // bool slot1 = (slot == 1);
+    // return slot1;
   }
 
   private static bool CheckTitlemap()
@@ -159,12 +168,13 @@ class m8f_ls_EventHandler : EventHandler
     return isTitlemap;
   }
 
-  private static bool IsWeaponReady(PlayerInfo player)
+  private static bool IsWeaponReady(PlayerInfo player, int hand)
   {
     if (!player) { return false; }
-
-    bool isReady = (player.WeaponState & WF_WEAPONREADY)
-      || (player.WeaponState & WF_WEAPONREADYALT);
+    int readystate = !!hand ? WF_OFFHANDREADY : WF_WEAPONREADY;
+    int altstate = !!hand ? WF_OFFHANDREADYALT : WF_WEAPONREADYALT;
+    bool isReady = (player.WeaponState & readystate)
+      || (player.WeaponState & altstate);
 
     return isReady;
   }
